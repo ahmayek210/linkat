@@ -275,7 +275,7 @@
       </div>
     </aside>
   </div>
-  <script type="application/json" id="seed-data">{"version":2,"links":[{"id":"ada-galeri","name":"Ada Galeri","url":"https://ahmayek210.github.io/ada-galeri/"},{"id":"middle-finger","name":"Middle Finger","url":"https://ahmayek210.github.io/middilefinger/"},{"id":"blup","name":"Blup","url":"https://ahmayek210.github.io/meme-gallery-blue/"},{"id":"capcat","name":"Capcat","url":"https://ahmayek210.github.io/capcat/"}]}</script>
+  <script type="application/json" id="seed-data">{"version":3,"links":[{"id":"ada-galeri","name":"Ada Galeri","url":"https://ahmayek210.github.io/ada-galeri/"},{"id":"middle-finger","name":"Middle Finger","url":"https://ahmayek210.github.io/middilefinger/"},{"id":"blup","name":"Blup","url":"https://ahmayek210.github.io/meme-gallery-blue/"},{"id":"capcat","name":"Capcat","url":"https://ahmayek210.github.io/capcat/"},{"id":"ada-vs-kitaplik","name":"Ada vs. Kitaplık","url":"https://ahmayek210.github.io/vs-kitaplik/"},{"id":"konuyok","name":"KonuYok","url":"https://ahmayek210.github.io/konuyok/"},{"id":"hadi-cizelim","name":"Hadi Çizelim","url":"https://ahmayek210.github.io/hadi-cizelim/"}]}</script>
   <script>
     (() => {
       'use strict';
@@ -295,6 +295,18 @@
       let editingId = null;
       let toastTimer = null;
       let lastFocus = null;
+      // Upgrade v2 once, preserving the user's links and any already-added sites.
+      if(saved && saved.version === 2 && seed.version === 3) {
+        links = saved.links.slice();
+        for(const item of seed.links.slice(4)) {
+          const sameUrl = value => {
+            try { const url = new URL(value); return url.origin.toLowerCase()+url.pathname.replace(/\/+$/, '').toLowerCase(); }
+            catch (_) { return value; }
+          };
+          if(!links.some(link => link.id === item.id || sameUrl(link.url) === sameUrl(item.url))) links.push(item);
+        }
+        persist();
+      }
       const NS = 'http://www.w3.org/2000/svg';
       const SVG_ICONS = {
         youtube: '<rect x="3" y="6" width="42" height="36" rx="11" fill="currentColor"/><path d="m21 16 13 8-13 8z" fill="#FCFCE8"/>',
@@ -369,15 +381,19 @@
         }
         if(!success) {
           const temp=document.createElement('textarea');
-          temp.value=url;temp.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
-          document.body.append(temp);temp.focus();temp.select();
+          temp.value=url;temp.setAttribute('readonly','');temp.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+          document.body.append(temp);temp.focus();temp.select();temp.setSelectionRange(0,temp.value.length);
           try {success=document.execCommand('copy');} catch (_) {}
           temp.remove();
         }
         if(success) {
           if(navigator.vibrate) navigator.vibrate(28);
           showToast(name+' bağlantısı kopyalandı');
-        } else showToast('Kopyalama engellendi. HTTPS üzerinden dene.');
+        } else {
+          showToast('Otomatik kopyalama başarısız. Bağlantıyı elle kopyala.');
+          window.prompt('Bağlantıyı seçip elle kopyalayın:', url);
+        }
+        return success;
       }
       function setupHold(card, link) {
         const ring=card.querySelector('.meter');
@@ -412,9 +428,11 @@
           if(didHold){
             suppress=true;
             e.preventDefault();
-            card.classList.remove('is-copied');void card.offsetWidth;card.classList.add('is-copied');
-            copyUrl(link.url,link.name);
-            setTimeout(()=>{suppress=false;card.classList.remove('is-copied');},420);
+            copyUrl(link.url,link.name).then(success=>{
+              if(success){card.classList.remove('is-copied');void card.offsetWidth;card.classList.add('is-copied');}
+              setTimeout(()=>card.classList.remove('is-copied'),420);
+            });
+            setTimeout(()=>{suppress=false;},1000);
           }
         });
         card.addEventListener('pointercancel',reset);
